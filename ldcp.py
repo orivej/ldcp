@@ -16,7 +16,12 @@ def collect(roots):
         if filename in paths:
             return
         paths[filename] = path
-        out = subprocess.check_output(['ldd', path])
+
+        try:
+            out = subprocess.check_output(['ldd', path])
+        except subprocess.CalledProcessError:
+            return
+
         for line in out.splitlines():
             args = line.split()
             if 'linux-vdso.so.1' in args or 'statically' in args:
@@ -47,8 +52,13 @@ def save(paths, dst):
         if filename == LDLINUX:
             continue
 
+        try:
+            headers = subprocess.check_output(['objdump', '-h', dstpath])
+        except subprocess.CalledProcessError:
+            continue
+
         args = ['patchelf', '--set-rpath', '$ORIGIN']
-        if '.interp' in subprocess.check_output(['objdump', '-h', dstpath]).split():
+        if '.interp' in headers.split():
             args += ['--set-interpreter', './ld-linux-x86-64.so.2']
         subprocess.check_call(args + [dstpath])
 
