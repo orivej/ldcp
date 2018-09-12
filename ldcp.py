@@ -5,8 +5,10 @@ import os
 import shutil
 import subprocess
 
-LDLINUX = 'ld-linux-x86-64.so.2'
-
+LDLINUX = {
+    'elf32-i386': 'ld-linux.so.2',
+    'elf64-x86-64': 'ld-linux-x86-64.so.2'
+}
 
 def collect(roots):
     paths = {}
@@ -24,7 +26,7 @@ def collect(roots):
 
         for line in out.splitlines():
             args = line.split()
-            if 'linux-vdso.so.1' in args or 'statically' in args:
+            if 'linux-vdso.so.1' in args or 'linux-gate.so.1' in args or 'statically' in args:
                 continue
 
             if '=>' in args:
@@ -49,17 +51,21 @@ def save(paths, dst):
         shutil.copy(path, dst)
         os.chmod(dstpath, 0755)
 
-        if filename == LDLINUX:
+        if filename in LDLINUX.values():
             continue
 
         try:
-            headers = subprocess.check_output(['objdump', '-h', dstpath])
+            headers = subprocess.check_output(['objdump', '-h', dstpath]).split()
         except subprocess.CalledProcessError:
             continue
 
+        if 'format' not in headers[:-1]:
+            continue
+
+        ldlinux = LDLINUX[headers[headers.index('format') + 1]]
         args = ['patchelf', '--set-rpath', '$ORIGIN']
-        if '.interp' in headers.split():
-            args += ['--set-interpreter', './ld-linux-x86-64.so.2']
+        if '.interp' in headers:
+            args += ['--set-interpreter', './' + ldlinux]
         subprocess.check_call(args + [dstpath])
 
         if '.so' not in filename:
@@ -67,11 +73,12 @@ def save(paths, dst):
             with open(dstpath, 'w') as f:
                 f.write('#!/bin/sh\n')
                 f.write('d="$(dirname "$(readlink -f "$0")")"\n')
-                f.write('exec "$d/{}" "$d/{}" "$@"\n'.format(LDLINUX, filename + '.bin'))
+                f.write('exec "$d/{}" "$d/{}" "$@"\n'.format(ldlinux, filename + '.bin'))
             os.chmod(dstpath, 0755)
 
 
 def main():
+    os.environ['LANG'] = 'C'
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
     arg('dst')
