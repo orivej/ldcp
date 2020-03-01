@@ -48,7 +48,8 @@ def save(paths, dst):
 
     for filename, path in paths.iteritems():
         dstpath = os.path.join(dst, filename)
-        shutil.copy(path, dst)
+        if not os.path.exists(dstpath) or not os.path.samefile(path, dstpath):
+            shutil.copy(path, dstpath)
         os.chmod(dstpath, 0755)
 
         if filename in LDLINUX.values():
