@@ -20,7 +20,7 @@ def collect(roots):
         paths[filename] = path
 
         try:
-            out = subprocess.check_output(['ldd', path])
+            out = subprocess.check_output(['ldd', path]).decode('UTF-8')
         except subprocess.CalledProcessError:
             return
 
@@ -46,17 +46,17 @@ def save(paths, dst):
     if not os.path.exists(dst):
         os.makedirs(dst)
 
-    for filename, path in paths.iteritems():
+    for filename, path in paths.items():
         dstpath = os.path.join(dst, filename)
         if not os.path.exists(dstpath) or not os.path.samefile(path, dstpath):
             shutil.copy(path, dstpath)
-        os.chmod(dstpath, 0755)
+        os.chmod(dstpath, 0o755)
 
         if filename in LDLINUX.values():
             continue
 
         try:
-            headers = subprocess.check_output(['objdump', '-h', dstpath]).split()
+            headers = subprocess.check_output(['objdump', '-h', dstpath]).decode('UTF-8').split()
         except subprocess.CalledProcessError:
             continue
 
@@ -75,7 +75,7 @@ def save(paths, dst):
                 f.write('#!/bin/sh\n')
                 f.write('d="$(dirname "$(readlink -f "$0")")"\n')
                 f.write('exec "$d/{}" "$d/{}" "$@"\n'.format(ldlinux, filename + '.bin'))
-            os.chmod(dstpath, 0755)
+            os.chmod(dstpath, 0o755)
 
 
 def main():
